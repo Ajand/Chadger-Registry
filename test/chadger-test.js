@@ -87,7 +87,6 @@ describe("Chadger Tests", function () {
 
     const chadgerRegistry2 = await ChadgerRegistry.deploy();
 
-
     await expect(
       chadgerRegistry2
         .connect(strategiest1)
@@ -108,6 +107,20 @@ describe("Chadger Tests", function () {
           metaPointer1
         )
     ).to.be.revertedWith("Vault implementation does not exists.");
+  });
+
+  it("Must throw for getting a vault detail that does not exists", async function () {
+    await expect(chadgerRegistry.getVaultDetails(guardian1)).to.be.revertedWith(
+      "There is no vault with that address you're looking for."
+    );
+  });
+
+  it("Must be able to get a vault details", async function () {
+    const currentVaults = await chadgerRegistry.getVaultsAddresses();
+
+    //currentVaults[0]
+    console.log(currentVaults);
+    console.log(await chadgerRegistry.getVaultDetails(currentVaults[0]));
   });
 
   // let's add vault getter

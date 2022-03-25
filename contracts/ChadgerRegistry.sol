@@ -3,11 +3,13 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "../interfaces/badger/IVault.sol";
+import "../interfaces/badger/IStrategy.sol";
 
 contract ChadgerRegistry is Initializable {
     // ===== Libraries  ====
@@ -21,8 +23,29 @@ contract ChadgerRegistry is Initializable {
     mapping(address => RegisteredVault) public registeries; // This is for
 
     /// ===== Chadger Data Structures ====
+    /// @dev this struct is going to be used when you want to return a vault details
+    // for returning an array of vaults you should use VaultData instead
+    struct VaultDataDetails {
+        address strategist;
+        VaultStatus status;
+        string metaPointer;
+        uint256 tvl;
+        address vaultAddress;
+        address token;
+        address keeper;
+        address guardian;
+        address treasury;
+        address badgerTree;
+        string name;
+        string symbol;
+        uint256 performanceFeeGovernance;
+        uint256 performanceFeeStrategist;
+        uint256 withdrawalFee;
+        uint256 managementFee;
+        address strategy;
+    }
 
-    /// @notice This is struct is for adding meta information to the added vault
+    /// @dev This is struct is for adding meta information to the added vault
     struct RegisteredVault {
         IVault vault;
         address strategist;
@@ -44,7 +67,7 @@ contract ChadgerRegistry is Initializable {
 
     /// ===== Chadger Modifiers ====
 
-    /// @dev it will check whether the vault implementation address exists or not
+    /// @dev only will pass if the vault implementation address exists or not
     modifier vaultImplementationExists() {
         require(
             vaultImplementation != address(0),
@@ -53,9 +76,18 @@ contract ChadgerRegistry is Initializable {
         _;
     }
 
-    /// @dev it will check whether the msg.sender is governance or not.
+    /// @dev only will pass if the msg.sender is governance or not.
     modifier onlyGovernance() {
         require(msg.sender == governance, "You are not the Chadger governance");
+        _;
+    }
+
+    /// @dev only will pass if the msg.sender is governance or not.
+    modifier onlyIfVaultExists(address _vaultAddress) {
+        require(
+            vaults.contains(_vaultAddress),
+            "There is no vault with that address you're looking for."
+        );
         _;
     }
 
@@ -114,5 +146,56 @@ contract ChadgerRegistry is Initializable {
             _metaPointer
         );
         emit VaultAdded(msg.sender, vault);
+    }
+
+    /// @notice using to get a single vault details
+    function getVaultDetails(address _vaultAddress)
+        public
+        view
+        onlyIfVaultExists(_vaultAddress)
+        returns (VaultDataDetails memory vaultDetails)
+    {
+        IVault vault = IVault(_vaultAddress);
+        vaultDetails.status = registeries[_vaultAddress].status;
+        vaultDetails.metaPointer = registeries[_vaultAddress].metaPointer;
+        vaultDetails.strategy = vault.strategy();
+
+        /// @dev if strategy is setted on the vault it will shows the balance
+        /// otherwise it will return 0
+        /// if we didn't handle it this way it would caused an error
+        vaultDetails.tvl = vaultDetails.strategy != address(0)
+            ? vault.balance()
+            : 0;
+
+        vaultDetails.strategist = vault.strategist();
+        vaultDetails.keeper = vault.keeper();
+        vaultDetails.guardian = vault.guardian();
+        vaultDetails.treasury = vault.treasury();
+        vaultDetails.badgerTree = vault.badgerTree();
+
+        vaultDetails.vaultAddress = _vaultAddress;
+        vaultDetails.token = vault.token();
+
+        vaultDetails.name = vault.name();
+        vaultDetails.symbol = vault.symbol();
+        vaultDetails.performanceFeeGovernance = vault
+            .performanceFeeGovernance();
+        vaultDetails.performanceFeeStrategist = vault
+            .performanceFeeStrategist();
+        vaultDetails.withdrawalFee = vault.withdrawalFee();
+        vaultDetails.managementFee = vault.managementFee();
+
+        // Balance of rewards
+        // USD
+        // tokenName
+    }
+
+    // @notice getting the address of all vaults
+    function getVaultsAddresses() public view returns (address[] memory) {
+        address[] memory list = new address[](vaults.length());
+        for (uint256 i = 0; i < vaults.length(); i++) {
+            list[i] = vaults.at(i);
+        }
+        return list;
     }
 }
