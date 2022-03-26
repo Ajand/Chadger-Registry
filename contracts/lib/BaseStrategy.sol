@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-import "../interfaces/badger/IVault.sol";
+import "../../interfaces/badger/IVault.sol";
 
 /*
     ===== Badger Base Strategy =====
