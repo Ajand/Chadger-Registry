@@ -106,21 +106,53 @@ describe("Chadger Tests", function () {
           ],
           metaPointer1
         )
-    ).to.be.revertedWith("Vault implementation does not exists.");
+    ).to.be.revertedWith("no implementation");
   });
 
   it("Must throw for getting a vault detail that does not exists", async function () {
     await expect(chadgerRegistry.getVaultDetails(guardian1)).to.be.revertedWith(
-      "There is no vault with that address you're looking for."
+      "no vault exists"
     );
+  });
+
+  it("Must be able to get a vault addresses", async function () {
+    const currentVaults = await chadgerRegistry.getVaultsAddresses();
+    expect(currentVaults.length).to.equal(1);
   });
 
   it("Must be able to get a vault details", async function () {
     const currentVaults = await chadgerRegistry.getVaultsAddresses();
+    const firstVaultDetails = await chadgerRegistry.getVaultDetails(
+      currentVaults[0]
+    );
 
-    //currentVaults[0]
-    console.log(currentVaults);
-    console.log(await chadgerRegistry.getVaultDetails(currentVaults[0]));
+    expect(firstVaultDetails.strategist).to.equal(strategiest1.address);
+    expect(firstVaultDetails.status).to.equal(0);
+    expect(firstVaultDetails.metaPointer).to.equal(metaPointer1);
+    expect(String(firstVaultDetails.tvl)).to.equal(String(0));
+    expect(firstVaultDetails.vaultAddress).to.equal(currentVaults[0]);
+    expect(firstVaultDetails.token).to.equal(mockToken1.address);
+    expect(firstVaultDetails.keeper).to.equal(keeper1);
+    expect(firstVaultDetails.guardian).to.equal(guardian1);
+    expect(firstVaultDetails.treasury).to.equal(treasury1);
+    expect(firstVaultDetails.badgerTree).to.equal(badgerTree1);
+    expect(firstVaultDetails.name).to.equal(name1);
+    expect(firstVaultDetails.symbol).to.equal(symbol1);
+    expect(String(firstVaultDetails.performanceFeeGovernance)).to.equal(
+      String(performanceFeeGovernance1)
+    );
+    expect(String(firstVaultDetails.performanceFeeStrategist)).to.equal(
+      String(performanceFeeStrategist1)
+    );
+    expect(String(firstVaultDetails.withdrawalFee)).to.equal(
+      String(withdrawalFee1)
+    );
+    expect(String(firstVaultDetails.managementFee)).to.equal(
+      String(managementFee1)
+    );
+    expect(String(firstVaultDetails.strategy)).to.equal(
+      String("0x0000000000000000000000000000000000000000")
+    );
   });
 
   // let's add vault getter

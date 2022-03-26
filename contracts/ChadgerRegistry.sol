@@ -69,25 +69,19 @@ contract ChadgerRegistry is Initializable {
 
     /// @dev only will pass if the vault implementation address exists or not
     modifier vaultImplementationExists() {
-        require(
-            vaultImplementation != address(0),
-            "Vault implementation does not exists."
-        );
+        require(vaultImplementation != address(0), "no implementation");
         _;
     }
 
     /// @dev only will pass if the msg.sender is governance or not.
     modifier onlyGovernance() {
-        require(msg.sender == governance, "You are not the Chadger governance");
+        require(msg.sender == governance, "only governance");
         _;
     }
 
     /// @dev only will pass if the msg.sender is governance or not.
     modifier onlyIfVaultExists(address _vaultAddress) {
-        require(
-            vaults.contains(_vaultAddress),
-            "There is no vault with that address you're looking for."
-        );
+        require(vaults.contains(_vaultAddress), "no vault exists");
         _;
     }
 
