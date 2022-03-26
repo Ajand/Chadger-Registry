@@ -26,17 +26,20 @@ describe("Chadger Tests", function () {
     chadgerGoverner = signers[10];
 
     const Vault = await ethers.getContractFactory("Vault");
+    const PriceFinder = await ethers.getContractFactory("PriceFinder");
 
     const ChadgerRegistry = await ethers.getContractFactory("ChadgerRegistry");
 
     vaultImplementation = await Vault.deploy();
+    const priceFinder = await PriceFinder.deploy();
 
     chadgerRegistry = await ChadgerRegistry.deploy();
 
     await expect(
       chadgerRegistry.initialize(
         vaultImplementation.address,
-        chadgerGoverner.address
+        chadgerGoverner.address,
+        priceFinder.address
       )
     ).to.not.be.reverted;
   });
@@ -153,5 +156,21 @@ describe("Chadger Tests", function () {
     expect(String(firstVaultDetails.strategy)).to.equal(
       String("0x0000000000000000000000000000000000000000")
     );
+  });
+
+  it("Must be able to get user deposit for a vault", async function () {
+    const currentVaults = await chadgerRegistry.getVaultsAddresses();
+    const firstVaultDetails = await chadgerRegistry.getVaultDetails(
+      currentVaults[0]
+    );
+
+    const userDeposit = await chadgerRegistry.getUserVaultBalance(
+      currentVaults[0],
+      strategiest1.address
+    );
+
+    expect(String(userDeposit.token)).to.equal(firstVaultDetails.token);
+    expect(String(userDeposit.amount)).to.equal(String(0));
+    expect(String(userDeposit.usd)).to.equal(String(0));
   });
 });

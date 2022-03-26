@@ -10,14 +10,18 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "../interfaces/badger/IVault.sol";
 import "../interfaces/badger/IStrategy.sol";
+import "../interfaces/badger/IPriceFinder.sol";
 
 contract ChadgerRegistry is Initializable {
     // ===== Libraries  ====
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    uint256 constant ONE_ETH = 1e18;
+
     /// ===== Storage Variables ====
     address public vaultImplementation; // vault implementation address that is using for oz clones
     address public governance; // address of the governance of the chadger - should be multisig
+    address public priceFinder; // address of the price finder of the chadger - this will be used to get usd prices on chain
 
     EnumerableSet.AddressSet private vaults; // This is an enumerable set of vaults that exists, using to iterate over
     mapping(address => RegisteredVault) public registeries; // This is for
@@ -53,6 +57,13 @@ contract ChadgerRegistry is Initializable {
         string metaPointer;
     }
 
+    /// @dev this struct is for reporting a token reports, it shows the token address, amount, and usd price
+    struct TokenReport {
+        address token;
+        uint256 amount;
+        uint256 usd;
+    }
+
     /// @notice Each registered vault could be in these statuses, Staging, Production, Deprecated
     /// Each vault start as a staging vault but registry governance can change the vault status
     enum VaultStatus {
@@ -73,13 +84,19 @@ contract ChadgerRegistry is Initializable {
         _;
     }
 
+    /// @dev only will pass if the priceFinder exists.
+    modifier onlyPriceFinderExists() {
+        require(priceFinder != address(0), "no priceFinder");
+        _;
+    }
+
     /// @dev only will pass if the msg.sender is governance or not.
     modifier onlyGovernance() {
         require(msg.sender == governance, "only governance");
         _;
     }
 
-    /// @dev only will pass if the msg.sender is governance or not.
+    /// @dev only will pass if the needed vault exists.
     modifier onlyIfVaultExists(address _vaultAddress) {
         require(vaults.contains(_vaultAddress), "no vault exists");
         _;
@@ -88,13 +105,17 @@ contract ChadgerRegistry is Initializable {
     /// @notice Initializes the Registry. Can only be called once, ideally when the contract is deployed.
     /// @param _vaultImplementation the implementation address that is using for cloning vault 1.5
     /// @param _governer Address authorized as governance.
-    function initialize(address _vaultImplementation, address _governer)
-        public
-        initializer
-    {
+    function initialize(
+        address _vaultImplementation,
+        address _governer,
+        address _priceFinder
+    ) public initializer {
         vaultImplementation = _vaultImplementation;
         governance = _governer;
+        priceFinder = _priceFinder;
     }
+
+    // TODO should add the change of state variables
 
     /// @notice add vaults using OZ Clone
     /// @param _token Address of the token that can be deposited into the sett.
@@ -191,5 +212,24 @@ contract ChadgerRegistry is Initializable {
             list[i] = vaults.at(i);
         }
         return list;
+    }
+
+    // @notice getting the balance of a user for specific vault
+    function getUserVaultBalance(address _vaultAddress, address _userAddrress)
+        public
+        view
+        onlyIfVaultExists(_vaultAddress)
+        onlyPriceFinderExists
+        returns (TokenReport memory report)
+    {
+        IVault vault = IVault(_vaultAddress);
+        uint256 userShares = vault.balanceOf(_userAddrress);
+        uint256 pricePerShare = vault.getPricePerFullShare();
+        uint256 userBalance = (pricePerShare * userShares) / ONE_ETH;
+        report = TokenReport(
+            vault.token(),
+            userBalance,
+            IPriceFinder(priceFinder).getUSDPrice(vault.token(), userBalance)
+        );
     }
 }

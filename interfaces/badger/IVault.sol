@@ -54,8 +54,14 @@ interface IVault {
 
     function badgerTree() external view returns (address);
 
+    function getPricePerFullShare() external view returns (uint256);
+
     // the name and symbol are come from the fact that each vault is also an ERC20Upgradeable
     function name() external view returns (string memory);
 
     function symbol() external view returns (string memory);
+
+    function balanceOf(address) external view returns (uint256);
+
+    function totalSupply() external view returns (string memory);
 }
