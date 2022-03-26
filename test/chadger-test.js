@@ -158,19 +158,27 @@ describe("Chadger Tests", function () {
     );
   });
 
-  it("Must be able to get user deposit for a vault", async function () {
+  it("Must be able to get user balance for a vault", async function () {
     const currentVaults = await chadgerRegistry.getVaultsAddresses();
     const firstVaultDetails = await chadgerRegistry.getVaultDetails(
       currentVaults[0]
     );
 
-    const userDeposit = await chadgerRegistry.getUserVaultBalance(
+    const userBalance = await chadgerRegistry.getUserVaultBalance(
       currentVaults[0],
       strategiest1.address
     );
 
-    expect(String(userDeposit.token)).to.equal(firstVaultDetails.token);
-    expect(String(userDeposit.amount)).to.equal(String(0));
-    expect(String(userDeposit.usd)).to.equal(String(0));
+    expect(String(userBalance.token)).to.equal(firstVaultDetails.token);
+    expect(String(userBalance.amount)).to.equal(String(0));
+    expect(String(userBalance.usd)).to.equal(String(0));
+  });
+
+  it("Must be able to get user balance for all vaults", async function () {
+    const userBalance = await chadgerRegistry.getUserBalance(
+      strategiest1.address
+    );
+
+    console.log(userBalance);
   });
 });

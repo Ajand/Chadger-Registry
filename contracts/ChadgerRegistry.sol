@@ -214,7 +214,7 @@ contract ChadgerRegistry is Initializable {
         return list;
     }
 
-    // @notice getting the balance of a user for specific vault
+    /// @notice getting the balance of a user for specific vault
     function getUserVaultBalance(address _vaultAddress, address _userAddrress)
         public
         view
@@ -231,5 +231,22 @@ contract ChadgerRegistry is Initializable {
             userBalance,
             IPriceFinder(priceFinder).getUSDPrice(vault.token(), userBalance)
         );
+    }
+
+    /// @notice getting the balance of a user for all vaults
+    /// it will also return another entry which is the sum of all vault data
+    function getUserBalance(address _userAddrress)
+        public
+        view
+        onlyPriceFinderExists
+        returns (TokenReport[] memory)
+    {
+        TokenReport[] memory reports = new TokenReport[](vaults.length());
+
+        for (uint256 i = 0; i < vaults.length(); i++) {
+            reports[i] = getUserVaultBalance(vaults.at(i), _userAddrress);
+        }
+
+        return reports;
     }
 }
