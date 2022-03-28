@@ -1,6 +1,11 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+function addMonths(date, months) {
+  date.setMonth(date.getMonth() + months);
+  return date;
+}
+
 describe("Chadger Tests", function () {
   let chadgerRegistry,
     signers,
@@ -22,7 +27,7 @@ describe("Chadger Tests", function () {
 
   it("Must be able to initialize contract with proper contract", async function () {
     signers = await ethers.getSigners();
-
+    2;
     chadgerGoverner = signers[10];
 
     const Vault = await ethers.getContractFactory("Vault");
@@ -285,5 +290,29 @@ describe("Chadger Tests", function () {
     );
 
     expect(String(firstVaultDetails.status)).to.equal(String(1));
+  });
+
+  it("Let's test the APR calculator", async function () {
+    const currentVaults = await chadgerRegistry.getVaultsAddresses();
+    const firstVaultAPR = await chadgerRegistry.getVaultAPR(currentVaults[0]);
+
+    const aYearAgo = parseInt(addMonths(new Date(), -12) / 1000);
+    const sixMonthAgo = parseInt(addMonths(new Date(), -6) / 1000);
+
+    expect(
+      String(await chadgerRegistry.calculateAPR(0, aYearAgo, 1000))
+    ).to.equal("0");
+
+    expect(
+      String(await chadgerRegistry.calculateAPR(1000, aYearAgo, 1000))
+    ).to.equal("10000");
+
+    expect(
+      String(await chadgerRegistry.calculateAPR(1000, sixMonthAgo, 1000))
+    ).to.equal("20000");
+
+    expect(
+      String(await chadgerRegistry.calculateAPR(200, sixMonthAgo, 1000))
+    ).to.equal("4000");
   });
 });

@@ -16,7 +16,10 @@ contract ChadgerRegistry is Initializable {
     // ===== Libraries  ====
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    uint256 constant ONE_ETH = 1e18;
+    /// ===== Constants ====
+    uint256 public constant PERCENT_DEMONITATOR = 10_000;
+    uint256 public constant ONE_ETH = 1e18;
+    uint256 public constant ONE_YEAR = 365 days + 6 hours;
 
     /// ===== Storage Variables ====
     address public vaultImplementation; // vault implementation address that is using for oz clones
@@ -55,12 +58,20 @@ contract ChadgerRegistry is Initializable {
         address strategist;
         VaultStatus status;
         string metaPointer;
+        uint256 registredAt;
     }
 
     /// @dev this struct is for reporting a token reports, it shows the token address, amount, and usd price
     struct TokenReport {
         address token;
         uint256 amount;
+        uint256 usd;
+    }
+
+    /// @dev this struct is for reporting a token reports, it shows the token address, amount, and usd price
+    struct TokenAprReport {
+        address token;
+        uint16 amount;
         uint256 usd;
     }
 
@@ -203,7 +214,8 @@ contract ChadgerRegistry is Initializable {
             IVault(vault),
             msg.sender,
             VaultStatus.Staging,
-            _metaPointer
+            _metaPointer,
+            block.timestamp
         );
         emit VaultAdded(msg.sender, vault);
     }
@@ -305,5 +317,35 @@ contract ChadgerRegistry is Initializable {
         }
 
         return reports;
+    }
+
+    function getVaultAPR(address _vaultAddress)
+        public
+        view
+        onlyIfVaultExists(_vaultAddress)
+        onlyPriceFinderExists
+        returns (TokenAprReport[] memory)
+    {
+        IVault vault = IVault(_vaultAddress);
+        require(vault.strategy() != address(0), "No strategy!");
+    }
+
+    /// @notice this is a utility function to calculate apr
+    /// @dev it's not dependent on the token you are putting but _reward and _tvl must be
+    /// in the same currency, so it makes sense to put dollar value for both of them
+    /// @param _addon This is the reward balance of a token in a vault, usually in USD
+    /// @param _startFrom This should be the lastHarvestedAt of a vault, if it does not exists it should be the registered at
+    /// @param _total This should be the balance of vault usually in USD
+    function calculateAPR(
+        uint256 _addon,
+        uint256 _startFrom,
+        uint256 _total
+    ) public view returns (uint256) {
+        if (_total <= 0) return 20; // This does not make sense to have less than min TVL
+        if (block.timestamp <= _startFrom) return 30; // This does not make to start from a future time
+        return
+            (_addon *
+                PERCENT_DEMONITATOR *
+                (ONE_YEAR / (block.timestamp - _startFrom))) / _total;
     }
 }
