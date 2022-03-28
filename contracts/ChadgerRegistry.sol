@@ -85,6 +85,10 @@ contract ChadgerRegistry is Initializable {
     }
 
     /// ===== Chadger Data Structures ====
+    event VaultImplementationChanged(address vaultImplementation);
+    event PriceFinderChanged(address priceFinder);
+    event GovernanceChanged(address governance);
+
     event VaultAdded(address indexed author, address indexed vault);
     event VaultStatusChanged(
         address indexed vaultAddress,
@@ -120,15 +124,40 @@ contract ChadgerRegistry is Initializable {
 
     /// @notice Initializes the Registry. Can only be called once, ideally when the contract is deployed.
     /// @param _vaultImplementation the implementation address that is using for cloning vault 1.5
-    /// @param _governer Address authorized as governance.
+    /// @param _governance Address authorized as governance.
+    /// @param _priceFinder is a helper smart contract to get usd price of tokens. It should be connected to an oracle
     function initialize(
         address _vaultImplementation,
-        address _governer,
+        address _governance,
         address _priceFinder
     ) public initializer {
         vaultImplementation = _vaultImplementation;
-        governance = _governer;
+        governance = _governance;
         priceFinder = _priceFinder;
+    }
+
+    /// @notice this will change the vault implementation
+    /// only the governance can do it
+    function changeVaultImplementation(address _vaultImplementation)
+        public
+        onlyGovernance
+    {
+        vaultImplementation = _vaultImplementation;
+        emit VaultImplementationChanged(_vaultImplementation);
+    }
+
+    /// @notice this will change the price finder
+    /// only the governance can do it
+    function changePriceFinder(address _priceFinder) public onlyGovernance {
+        priceFinder = _priceFinder;
+        emit PriceFinderChanged(_priceFinder);
+    }
+
+    /// @notice this will change the governance
+    /// only the governance can do it
+    function changeGovernance(address _governance) public onlyGovernance {
+        governance = _governance;
+        emit GovernanceChanged(_governance);
     }
 
     // TODO should add the change of state variables

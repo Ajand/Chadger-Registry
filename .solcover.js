@@ -10,5 +10,7 @@ module.exports = {
     "test/MockToken.sol",
     "test/MaliciousToken.sol",
     "test/MockContract.sol",
+    "test/RewardToken.sol",
+    "test/TestStrategy.sol",
   ],
 };

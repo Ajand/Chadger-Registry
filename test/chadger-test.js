@@ -44,6 +44,63 @@ describe("Chadger Tests", function () {
     ).to.not.be.reverted;
   });
 
+  it("Governer must be able to change initilization params after init but only governer ", async function () {
+    signers = await ethers.getSigners();
+
+    const Vault = await ethers.getContractFactory("Vault");
+    const newVaultImplementation = await Vault.deploy();
+    const PriceFinder = await ethers.getContractFactory("PriceFinder");
+    const newPriceFinder = await PriceFinder.deploy();
+
+    const newGoverner = signers[19];
+
+    await expect(
+      chadgerRegistry.changeVaultImplementation(newVaultImplementation.address)
+    ).to.be.revertedWith("only governance");
+
+    await expect(
+      chadgerRegistry.changePriceFinder(newPriceFinder.address)
+    ).to.be.revertedWith("only governance");
+
+    await expect(
+      chadgerRegistry.changeGovernance(newGoverner.address)
+    ).to.be.revertedWith("only governance");
+
+    await expect(
+      chadgerRegistry
+        .connect(chadgerGoverner)
+        .changeVaultImplementation(newVaultImplementation.address)
+    )
+      .to.emit(chadgerRegistry, "VaultImplementationChanged")
+      .withArgs(newVaultImplementation.address);
+
+    await expect(
+      chadgerRegistry
+        .connect(chadgerGoverner)
+        .changePriceFinder(newPriceFinder.address)
+    )
+      .to.emit(chadgerRegistry, "PriceFinderChanged")
+      .withArgs(newPriceFinder.address);
+
+    await expect(
+      chadgerRegistry
+        .connect(chadgerGoverner)
+        .changeGovernance(newGoverner.address)
+    )
+      .to.emit(chadgerRegistry, "GovernanceChanged")
+      .withArgs(newGoverner.address);
+
+    chadgerGoverner = newGoverner;
+
+    const vaultImplementation = await chadgerRegistry.vaultImplementation();
+    const governance = await chadgerRegistry.governance();
+    const priceFinder = await chadgerRegistry.priceFinder();
+
+    expect(vaultImplementation).to.equal(newVaultImplementation.address);
+    expect(governance).to.equal(newGoverner.address);
+    expect(priceFinder).to.equal(newPriceFinder.address);
+  });
+
   it("Must be able to add new contract to registery", async function () {
     const MockToken = await ethers.getContractFactory("MockToken");
     mockToken1 = await MockToken.deploy();
