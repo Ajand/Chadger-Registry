@@ -64,6 +64,18 @@ contract ChadgerRegistry is Initializable {
         uint256 usd;
     }
 
+    /// @dev Return value for harvest, tend and balanceOfRewards, use this for interacting with strategy
+    struct TokenAmount {
+        address token;
+        uint256 amount;
+    }
+
+    /// @dev this struct is for reporting a token apr, it shows the token address, amount, and usd price
+    struct TokenApr {
+        address token;
+        uint256 apr;
+    }
+
     /// @notice Each registered vault could be in these statuses, Staging, Production, Deprecated
     /// Each vault start as a staging vault but registry governance can change the vault status
     enum VaultStatus {

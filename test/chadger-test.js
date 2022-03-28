@@ -179,6 +179,47 @@ describe("Chadger Tests", function () {
       strategiest1.address
     );
 
-    console.log(userBalance);
+    expect(userBalance.length).to.equal(1);
+  });
+
+  it("Let's set strategy", async function () {
+    const currentVaults = await chadgerRegistry.getVaultsAddresses();
+    const TestStrategy = await ethers.getContractFactory("TestStrategy");
+
+    strategiest1 = signers[14];
+
+    const testStrategy = await TestStrategy.connect(strategiest1).deploy();
+
+    await testStrategy.initialize(currentVaults[0], [mockToken1.address]);
+
+    await expect(
+      vaultImplementation
+        .attach(currentVaults[0])
+        .connect(strategiest1)
+        .setStrategy(testStrategy.address)
+    )
+      .to.emit(vaultImplementation.attach(currentVaults[0]), "SetStrategy")
+      .withArgs(testStrategy.address);
+
+    const firstVaultDetails = await chadgerRegistry.getVaultDetails(
+      currentVaults[0]
+    );
+
+    expect(String(firstVaultDetails.strategy)).to.equal(testStrategy.address);
+
+    const staticCallReturns = await chadgerRegistry.tryStaticCall(
+      currentVaults[0]
+    );
+
+    const abiCoder = new ethers.utils.AbiCoder();
+
+    console.log(testStrategy.address)
+
+    console.log(JSON.stringify(testStrategy.callStatic.harvest));
+
+    //console.log(await testStrategy.harvest());
+    //console.log(
+    //  abiCoder.decode(['tuple(address, uint256)[]'], staticCallReturns)
+    //);
   });
 });
