@@ -98,7 +98,7 @@ contract TestStrategy is BaseStrategy {
         override
         returns (TokenAmount[] memory harvested)
     {
-      //  _onlyAuthorizedActors();
+        //  _onlyAuthorizedActors();
 
         // Amount of want autocompounded after harvest in terms of want
         // keep this to get paid!
@@ -109,7 +109,6 @@ contract TestStrategy is BaseStrategy {
         harvested[1] = TokenAmount(reward, 0); // Nothing harvested for Badger
         return harvested;
     }
-
 
     function test_empty_harvest()
         external
@@ -139,8 +138,14 @@ contract TestStrategy is BaseStrategy {
         _processExtraToken(token, amount);
 
         harvested = new TokenAmount[](2);
-        harvested[0] = TokenAmount(want, 0); // Nothing harvested for want
-        harvested[1] = TokenAmount(reward, amount);
+        harvested[0] = TokenAmount(
+            want,
+            IERC20Upgradeable(want).balanceOf(address(this))
+        );
+        harvested[1] = TokenAmount(
+            reward,
+            RewardToken(amount).balanceOf(address(this))
+        );
         return harvested;
     }
 
@@ -165,8 +170,14 @@ contract TestStrategy is BaseStrategy {
     {
         // Rewards are 0
         rewards = new TokenAmount[](2);
-        rewards[0] = TokenAmount(want, 0);
-        rewards[1] = TokenAmount(reward, 0);
+        rewards[0] = TokenAmount(
+            want,
+            IERC20Upgradeable(want).balanceOf(address(this))
+        );
+        rewards[1] = TokenAmount(
+            reward,
+            RewardToken(reward).balanceOf(address(this))
+        );
         return rewards;
     }
 }

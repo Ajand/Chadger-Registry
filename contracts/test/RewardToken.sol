@@ -7,7 +7,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 contract RewardToken is ERC20Upgradeable {
     function initialize() public initializer {
         __ERC20_init("Strategy Reward Token", "SRT");
-        _mint(msg.sender, 1_000_000_000_000);
+        //_mint(msg.sender, 1_000_000_000_000);
     }
 
     /// @dev Open minting capabilities

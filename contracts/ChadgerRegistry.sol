@@ -17,7 +17,7 @@ contract ChadgerRegistry is Initializable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// ===== Constants ====
-    uint256 public constant PERCENT_DEMONITATOR = 10_000;
+    uint256 public constant PERCENT_DENOMITATOR = 10_000;
     uint256 public constant ONE_ETH = 1e18;
     uint256 public constant ONE_YEAR = 365 days + 6 hours;
 
@@ -69,10 +69,11 @@ contract ChadgerRegistry is Initializable {
     }
 
     /// @dev this struct is for reporting a token reports, it shows the token address, amount, and usd price
-    struct TokenAprReport {
+    struct TokenRewardAprReport {
         address token;
-        uint16 amount;
+        uint256 amount;
         uint256 usd;
+        uint256 apr;
     }
 
     /// @dev Return value for harvest, tend and balanceOfRewards, use this for interacting with strategy
@@ -274,7 +275,7 @@ contract ChadgerRegistry is Initializable {
         // tokenName
     }
 
-    // @notice getting the address of all vaults
+    /// @notice getting the address of all vaults
     function getVaultsAddresses() public view returns (address[] memory) {
         address[] memory list = new address[](vaults.length());
         for (uint256 i = 0; i < vaults.length(); i++) {
@@ -319,17 +320,6 @@ contract ChadgerRegistry is Initializable {
         return reports;
     }
 
-    function getVaultAPR(address _vaultAddress)
-        public
-        view
-        onlyIfVaultExists(_vaultAddress)
-        onlyPriceFinderExists
-        returns (TokenAprReport[] memory)
-    {
-        IVault vault = IVault(_vaultAddress);
-        require(vault.strategy() != address(0), "No strategy!");
-    }
-
     /// @notice this is a utility function to calculate apr
     /// @dev it's not dependent on the token you are putting but _reward and _tvl must be
     /// in the same currency, so it makes sense to put dollar value for both of them
@@ -338,14 +328,55 @@ contract ChadgerRegistry is Initializable {
     /// @param _total This should be the balance of vault usually in USD
     function calculateAPR(
         uint256 _addon,
-        uint256 _startFrom,
-        uint256 _total
+        uint256 _total,
+        uint256 _startFrom
     ) public view returns (uint256) {
-        if (_total <= 0) return 20; // This does not make sense to have less than min TVL
-        if (block.timestamp <= _startFrom) return 30; // This does not make to start from a future time
+        if (_total <= 0) return 0; // This does not make sense to have less than min TVL
+        if (block.timestamp <= _startFrom) return 0; // This does not make to start from a future time
         return
             (_addon *
-                PERCENT_DEMONITATOR *
+                PERCENT_DENOMITATOR *
                 (ONE_YEAR / (block.timestamp - _startFrom))) / _total;
+    }
+
+    /// @notice this is a utility function to calculate apr
+    function getVaultAPR(address _vaultAddress)
+        public
+        view
+        onlyIfVaultExists(_vaultAddress)
+        onlyPriceFinderExists
+        returns (TokenRewardAprReport[] memory)
+    {
+        IVault vault = IVault(_vaultAddress);
+        IStrategy strategy = IStrategy(vault.strategy());
+        IStrategy.TokenAmount[] memory rewardsBalance = strategy
+            .balanceOfRewards();
+
+        TokenRewardAprReport[] memory aprReports = new TokenRewardAprReport[](
+            rewardsBalance.length
+        );
+
+        for (uint256 i = 0; i < rewardsBalance.length; i++) {
+            uint256 amountInUSD = IPriceFinder(priceFinder).getUSDPrice(
+                rewardsBalance[i].token,
+                rewardsBalance[i].amount
+            );
+            aprReports[i] = TokenRewardAprReport(
+                rewardsBalance[i].token,
+                rewardsBalance[i].amount,
+                amountInUSD,
+                calculateAPR(
+                    amountInUSD,
+                    vault.balance(),
+                    vault.lastHarvestedAt() > 0
+                        ? vault.lastHarvestedAt()
+                        : registeries[_vaultAddress].registredAt
+                )
+            );
+        }
+
+        return aprReports;
+
+        // loop over rewards balance
     }
 }

@@ -293,26 +293,65 @@ describe("Chadger Tests", function () {
   });
 
   it("Let's test the APR calculator", async function () {
-    const currentVaults = await chadgerRegistry.getVaultsAddresses();
-    const firstVaultAPR = await chadgerRegistry.getVaultAPR(currentVaults[0]);
-
     const aYearAgo = parseInt(addMonths(new Date(), -12) / 1000);
     const sixMonthAgo = parseInt(addMonths(new Date(), -6) / 1000);
+    const futureDate = parseInt(addMonths(new Date(), 1) / 1000);
 
     expect(
-      String(await chadgerRegistry.calculateAPR(0, aYearAgo, 1000))
+      String(await chadgerRegistry.calculateAPR(200, 0, sixMonthAgo))
     ).to.equal("0");
 
     expect(
-      String(await chadgerRegistry.calculateAPR(1000, aYearAgo, 1000))
+      String(await chadgerRegistry.calculateAPR(200, 1000, futureDate))
+    ).to.equal("0");
+
+    expect(
+      String(await chadgerRegistry.calculateAPR(0, 1000, aYearAgo))
+    ).to.equal("0");
+
+    expect(
+      String(await chadgerRegistry.calculateAPR(0, 1000, aYearAgo))
+    ).to.equal("0");
+
+    expect(
+      String(await chadgerRegistry.calculateAPR(1000, 1000, aYearAgo))
     ).to.equal("10000");
 
     expect(
-      String(await chadgerRegistry.calculateAPR(1000, sixMonthAgo, 1000))
+      String(await chadgerRegistry.calculateAPR(1000, 1000, sixMonthAgo))
     ).to.equal("20000");
 
     expect(
-      String(await chadgerRegistry.calculateAPR(200, sixMonthAgo, 1000))
+      String(await chadgerRegistry.calculateAPR(200, 1000, sixMonthAgo))
     ).to.equal("4000");
+  });
+
+  it("Let's test the APR calculator", async function () {
+    const currentVaults = await chadgerRegistry.getVaultsAddresses();
+
+    await mockToken1.mint(signers[0].address, 400000);
+    await mockToken1.approve(currentVaults[0], 400000);
+    //console.log(vaultImplementation.attach(currentVaults[0])["deposit"]);
+    await vaultImplementation
+      .attach(currentVaults[0])
+      ["deposit(uint256)"](400000);
+
+    await vaultImplementation
+      .attach(currentVaults[0])
+      .connect(strategiest1)
+      .earn();
+
+    await network.provider.send("evm_increaseTime", [3600 * 24 * 60]);
+    await network.provider.send("evm_mine");
+    const VaultAPR2Month = await chadgerRegistry.getVaultAPR(currentVaults[0]);
+
+    await network.provider.send("evm_increaseTime", [3600 * 24 * 60]);
+    await network.provider.send("evm_mine");
+
+    const VaultAPR4Month = await chadgerRegistry.getVaultAPR(currentVaults[0]);
+
+    expect(String(VaultAPR2Month[1].apr.div(VaultAPR4Month[1].apr))).to.equal(
+      String(2)
+    );
   });
 });

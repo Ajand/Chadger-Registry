@@ -64,4 +64,13 @@ interface IVault {
     function balanceOf(address) external view returns (uint256);
 
     function totalSupply() external view returns (string memory);
+
+    // harvest data
+    function lifeTimeEarned() external view returns (uint256);
+
+    function lastHarvestedAt() external view returns (uint256);
+
+    function lastHarvestAmount() external view returns (uint256);
+
+    function assetsAtLastHarvest() external view returns (uint256);
 }
