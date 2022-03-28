@@ -206,20 +206,27 @@ describe("Chadger Tests", function () {
     );
 
     expect(String(firstVaultDetails.strategy)).to.equal(testStrategy.address);
+  });
 
-    const staticCallReturns = await chadgerRegistry.tryStaticCall(
+  it("Only gorverner must be able to change the status of a vault", async function () {
+    const currentVaults = await chadgerRegistry.getVaultsAddresses();
+
+    await expect(
+      chadgerRegistry.changeVaultStatus(currentVaults[0], 2)
+    ).to.be.revertedWith("only governance");
+
+    await expect(
+      chadgerRegistry
+        .connect(chadgerGoverner)
+        .changeVaultStatus(currentVaults[0], 1)
+    )
+      .to.emit(chadgerRegistry, "VaultStatusChanged")
+      .withArgs(currentVaults[0], 1);
+
+    const firstVaultDetails = await chadgerRegistry.getVaultDetails(
       currentVaults[0]
     );
 
-    const abiCoder = new ethers.utils.AbiCoder();
-
-    console.log(testStrategy.address)
-
-    console.log(JSON.stringify(testStrategy.callStatic.harvest));
-
-    //console.log(await testStrategy.harvest());
-    //console.log(
-    //  abiCoder.decode(['tuple(address, uint256)[]'], staticCallReturns)
-    //);
+    expect(String(firstVaultDetails.status)).to.equal(String(1));
   });
 });

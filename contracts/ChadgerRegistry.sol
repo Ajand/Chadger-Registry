@@ -86,6 +86,10 @@ contract ChadgerRegistry is Initializable {
 
     /// ===== Chadger Data Structures ====
     event VaultAdded(address indexed author, address indexed vault);
+    event VaultStatusChanged(
+        address indexed vaultAddress,
+        VaultStatus indexed status
+    );
     // event VaultStatusChanged(address indexed author, address indexed vault);
 
     /// ===== Chadger Modifiers ====
@@ -173,6 +177,18 @@ contract ChadgerRegistry is Initializable {
             _metaPointer
         );
         emit VaultAdded(msg.sender, vault);
+    }
+
+    /// @notice this will change a vault status
+    /// only the governance can do it
+    function changeVaultStatus(address _vaultAddress, VaultStatus _vaultStatus)
+        public
+        onlyGovernance
+        onlyIfVaultExists(_vaultAddress)
+    {
+        RegisteredVault storage registeredVault = registeries[_vaultAddress];
+        registeredVault.status = _vaultStatus;
+        emit VaultStatusChanged(_vaultAddress, _vaultStatus);
     }
 
     /// @notice using to get a single vault details
