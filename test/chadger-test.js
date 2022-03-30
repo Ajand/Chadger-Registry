@@ -383,7 +383,7 @@ describe("Chadger Tests", function () {
       "badger.finance Mock Token"
     );
     expect(firstVaultSummary.token["symbol"]).to.equal("MOCK");
-    expect(String(firstVaultSummary.tvl)).to.equal(String(400000));
+    expect(String(firstVaultSummary.tvl)).to.equal(String(800000));
 
     await expect(
       chadgerRegistry

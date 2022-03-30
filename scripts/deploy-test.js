@@ -20,7 +20,7 @@ async function main() {
 
   console.log(signers.length);
 
-  const governer = signers[1];
+  const governer = signers[0];
 
   const Vault = await ethers.getContractFactory("Vault");
   const PriceFinder = await ethers.getContractFactory("PriceFinder");
@@ -39,9 +39,9 @@ async function main() {
 
   const MockToken = await ethers.getContractFactory("MockToken");
   const mockToken1 = await MockToken.deploy();
-  mockToken1.initialize([], [])
+  mockToken1.initialize([], []);
 
-  strategiest1 = signers[14];
+  strategiest1 = signers[0];
 
   keeper1 = signers[11].address;
   guardian1 = signers[12].address;
@@ -54,7 +54,7 @@ async function main() {
   withdrawalFee1 = 25;
   managementFee1 = 20;
   metaPointer1 =
-    "This is going to be changed by an ipfs url that will contain the vault metadata";
+    "bafkreien7tebl6bfhfzdyo5qun4matophsoqraf6vn5ibarg5mozztvfim";
 
   await chadgerRegistry
     .connect(strategiest1)
@@ -89,7 +89,23 @@ async function main() {
 
   console.log(`Chadger registry deployed at: ${chadgerRegistry.address}`);
 
-  console.log(await chadgerRegistry.governance())
+  console.log(await chadgerRegistry.governance());
+
+  await mockToken1.mint(signers[0].address, 1000000);
+  await mockToken1.approve(currentVaults[0], 400000);
+  //console.log(vaultImplementation.attach(currentVaults[0])["deposit"]);
+  await vaultImplementation
+    .attach(currentVaults[0])
+    ["deposit(uint256)"](400000);
+
+  await vaultImplementation
+    .attach(currentVaults[0])
+    .connect(strategiest1)
+    .earn();
+
+  // only for local
+  await network.provider.send("evm_increaseTime", [3600 * 24 * 60]);
+  await network.provider.send("evm_mine");
 
   //
   // const ChadgerRegistry = await ethers.getContractFactory("ChadgerRegistry");

@@ -406,7 +406,12 @@ contract ChadgerRegistry is Initializable {
         /// @dev if strategy is setted on the vault it will shows the balance
         /// otherwise it will return 0
         /// if we didn't handle it this way it would caused an error
-        vaultSummary.tvl = vault.strategy() != address(0) ? vault.balance() : 0;
+        vaultSummary.tvl = vault.strategy() != address(0)
+            ? IPriceFinder(priceFinder).getUSDPrice(
+                vault.token(),
+                vault.balance()
+            )
+            : 0;
 
         if (vault.strategy() == address(0)) {
             TokenRewardApyReport[]
