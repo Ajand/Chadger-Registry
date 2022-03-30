@@ -12,6 +12,9 @@ import "../interfaces/badger/IVault.sol";
 import "../interfaces/badger/IStrategy.sol";
 import "../interfaces/badger/IPriceFinder.sol";
 
+/// @dev in this there is a variable called _userAddrress
+/// it's using for preventing multiple request and for bundling all requests in a single view function
+/// you can always use address(0) to pass it. It's going to be used for showing a specific user deposits
 contract ChadgerRegistry is Initializable {
     // ===== Libraries  ====
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -26,19 +29,21 @@ contract ChadgerRegistry is Initializable {
     address public governance; // address of the governance of the chadger - should be multisig
     address public priceFinder; // address of the price finder of the chadger - this will be used to get usd prices on chain
 
+    EnumerableSet.AddressSet private strategists; // This is for returning strategists lists
+    mapping(address => EnumerableSet.AddressSet) private strategistsVaults; // This is for returning an strategist vaults
     EnumerableSet.AddressSet private vaults; // This is an enumerable set of vaults that exists, using to iterate over
     mapping(address => RegisteredVault) public registeries; // This is for
 
     /// ===== Chadger Data Structures ====
     /// @dev this struct is going to be used when you want to return a vault details
-    // for returning an array of vaults you should use VaultData instead
-    struct VaultDataDetails {
+    // for returning an liost of vaults you should use VaultSummary instead
+    struct VaultDetails {
         address strategist;
         VaultStatus status;
         string metaPointer;
         uint256 tvl;
         address vaultAddress;
-        address token;
+        Token token;
         address keeper;
         address guardian;
         address treasury;
@@ -50,6 +55,37 @@ contract ChadgerRegistry is Initializable {
         uint256 withdrawalFee;
         uint256 managementFee;
         address strategy;
+        TokenReport deposits;
+        uint256 lifeTimeEarned;
+        uint256 lastHarvestedAt;
+        uint256 lastHarvestAmount;
+        TokenRewardApyReport[] apyReports;
+    }
+
+    /// @dev this struct is going to be used when you want to return a list of vaults
+    struct VaultSummary {
+        address strategist;
+        VaultStatus status;
+        address vaultAddress;
+        Token token;
+        string name;
+        string symbol;
+        uint256 tvl;
+        TokenRewardApyReport[] apyReports;
+        TokenReport deposits;
+    }
+
+    /// @dev this struct is going to be used when you want to return a strategist info
+    struct StrategistWithVaults {
+        address strategist;
+        VaultSummary[] vaults;
+    }
+
+    /// @dev this struct is going to be used for sending a token data
+    struct Token {
+        address tokenAddress;
+        string name;
+        string symbol;
     }
 
     /// @dev This is struct is for adding meta information to the added vault
@@ -69,11 +105,11 @@ contract ChadgerRegistry is Initializable {
     }
 
     /// @dev this struct is for reporting a token reports, it shows the token address, amount, and usd price
-    struct TokenRewardAprReport {
-        address token;
+    struct TokenRewardApyReport {
+        Token token;
         uint256 amount;
         uint256 usd;
-        uint256 apr;
+        uint256 apy;
     }
 
     /// @dev Return value for harvest, tend and balanceOfRewards, use this for interacting with strategy
@@ -82,10 +118,10 @@ contract ChadgerRegistry is Initializable {
         uint256 amount;
     }
 
-    /// @dev this struct is for reporting a token apr, it shows the token address, amount, and usd price
-    struct TokenApr {
+    /// @dev this struct is for reporting a token apy, it shows the token address, amount, and usd price
+    struct TokenApy {
         address token;
-        uint256 apr;
+        uint256 apy;
     }
 
     /// @notice Each registered vault could be in these statuses, Staging, Production, Deprecated
@@ -211,6 +247,8 @@ contract ChadgerRegistry is Initializable {
             _feeConfig
         );
         vaults.add(vault);
+        strategists.add(msg.sender);
+        strategistsVaults[msg.sender].add(vault);
         registeries[vault] = RegisteredVault(
             IVault(vault),
             msg.sender,
@@ -231,48 +269,6 @@ contract ChadgerRegistry is Initializable {
         RegisteredVault storage registeredVault = registeries[_vaultAddress];
         registeredVault.status = _vaultStatus;
         emit VaultStatusChanged(_vaultAddress, _vaultStatus);
-    }
-
-    /// @notice using to get a single vault details
-    function getVaultDetails(address _vaultAddress)
-        public
-        view
-        onlyIfVaultExists(_vaultAddress)
-        returns (VaultDataDetails memory vaultDetails)
-    {
-        IVault vault = IVault(_vaultAddress);
-        vaultDetails.status = registeries[_vaultAddress].status;
-        vaultDetails.metaPointer = registeries[_vaultAddress].metaPointer;
-        vaultDetails.strategy = vault.strategy();
-
-        /// @dev if strategy is setted on the vault it will shows the balance
-        /// otherwise it will return 0
-        /// if we didn't handle it this way it would caused an error
-        vaultDetails.tvl = vaultDetails.strategy != address(0)
-            ? vault.balance()
-            : 0;
-
-        vaultDetails.strategist = vault.strategist();
-        vaultDetails.keeper = vault.keeper();
-        vaultDetails.guardian = vault.guardian();
-        vaultDetails.treasury = vault.treasury();
-        vaultDetails.badgerTree = vault.badgerTree();
-
-        vaultDetails.vaultAddress = _vaultAddress;
-        vaultDetails.token = vault.token();
-
-        vaultDetails.name = vault.name();
-        vaultDetails.symbol = vault.symbol();
-        vaultDetails.performanceFeeGovernance = vault
-            .performanceFeeGovernance();
-        vaultDetails.performanceFeeStrategist = vault
-            .performanceFeeStrategist();
-        vaultDetails.withdrawalFee = vault.withdrawalFee();
-        vaultDetails.managementFee = vault.managementFee();
-
-        // Balance of rewards
-        // USD
-        // tokenName
     }
 
     /// @notice getting the address of all vaults
@@ -320,13 +316,13 @@ contract ChadgerRegistry is Initializable {
         return reports;
     }
 
-    /// @notice this is a utility function to calculate apr
+    /// @notice this is a utility function to calculate apy
     /// @dev it's not dependent on the token you are putting but _reward and _tvl must be
     /// in the same currency, so it makes sense to put dollar value for both of them
     /// @param _addon This is the reward balance of a token in a vault, usually in USD
     /// @param _startFrom This should be the lastHarvestedAt of a vault, if it does not exists it should be the registered at
     /// @param _total This should be the balance of vault usually in USD
-    function calculateAPR(
+    function calculateAPY(
         uint256 _addon,
         uint256 _total,
         uint256 _startFrom
@@ -339,20 +335,20 @@ contract ChadgerRegistry is Initializable {
                 (ONE_YEAR / (block.timestamp - _startFrom))) / _total;
     }
 
-    /// @notice this is a utility function to calculate apr
-    function getVaultAPR(address _vaultAddress)
+    /// @notice this is a utility function to calculate apy
+    function getVaultAPY(address _vaultAddress)
         public
         view
         onlyIfVaultExists(_vaultAddress)
         onlyPriceFinderExists
-        returns (TokenRewardAprReport[] memory)
+        returns (TokenRewardApyReport[] memory)
     {
         IVault vault = IVault(_vaultAddress);
         IStrategy strategy = IStrategy(vault.strategy());
         IStrategy.TokenAmount[] memory rewardsBalance = strategy
             .balanceOfRewards();
 
-        TokenRewardAprReport[] memory aprReports = new TokenRewardAprReport[](
+        TokenRewardApyReport[] memory apyReports = new TokenRewardApyReport[](
             rewardsBalance.length
         );
 
@@ -361,11 +357,11 @@ contract ChadgerRegistry is Initializable {
                 rewardsBalance[i].token,
                 rewardsBalance[i].amount
             );
-            aprReports[i] = TokenRewardAprReport(
-                rewardsBalance[i].token,
+            apyReports[i] = TokenRewardApyReport(
+                getToken(rewardsBalance[i].token),
                 rewardsBalance[i].amount,
                 amountInUSD,
-                calculateAPR(
+                calculateAPY(
                     amountInUSD,
                     vault.balance(),
                     vault.lastHarvestedAt() > 0
@@ -375,8 +371,160 @@ contract ChadgerRegistry is Initializable {
             );
         }
 
-        return aprReports;
+        return apyReports;
+    }
 
-        // loop over rewards balance
+    /// @notice utility function to transfer a token address to Token Struct
+    function getToken(address _address) public view returns (Token memory) {
+        if (_address == address(0)) return Token(address(0), "", "");
+        ERC20 token = ERC20(_address);
+        return Token(_address, token.name(), token.symbol());
+    }
+
+    /// @notice using to get a single vault summary
+    function getVaultSummary(address _vaultAddress, address _userAddrress)
+        public
+        view
+        onlyIfVaultExists(_vaultAddress)
+        returns (VaultSummary memory vaultSummary)
+    {
+        IVault vault = IVault(_vaultAddress);
+        vaultSummary.strategist = vault.strategist();
+        vaultSummary.status = registeries[_vaultAddress].status;
+        vaultSummary.vaultAddress = _vaultAddress;
+        vaultSummary.token = getToken(vault.token());
+        vaultSummary.name = vault.name();
+        vaultSummary.symbol = vault.symbol();
+        if (_userAddrress != address(0)) {
+            vaultSummary.deposits = getUserVaultBalance(
+                _vaultAddress,
+                _userAddrress
+            );
+        } else {
+            vaultSummary.deposits = TokenReport(address(0), 0, 0);
+        }
+        /// @dev if strategy is setted on the vault it will shows the balance
+        /// otherwise it will return 0
+        /// if we didn't handle it this way it would caused an error
+        vaultSummary.tvl = vault.strategy() != address(0) ? vault.balance() : 0;
+
+        if (vault.strategy() == address(0)) {
+            TokenRewardApyReport[]
+                memory apyReports = new TokenRewardApyReport[](1);
+            apyReports[0] = (
+                TokenRewardApyReport(getToken(address(0)), 0, 0, 0)
+            );
+            vaultSummary.apyReports = apyReports;
+        } else {
+            vaultSummary.apyReports = getVaultAPY(_vaultAddress);
+        }
+    }
+
+    /// @notice using to get all vaults summary
+    function getVaultsSummary(address _userAddrress)
+        public
+        view
+        returns (VaultSummary[] memory)
+    {
+        VaultSummary[] memory vaultSummary = new VaultSummary[](
+            vaults.length()
+        );
+        for (uint256 i = 0; i < vaults.length(); i++) {
+            vaultSummary[i] = getVaultSummary(vaults.at(i), _userAddrress);
+        }
+        return vaultSummary;
+    }
+
+    /// @notice using to get a single vault details
+    function getVaultDetails(address _vaultAddress, address _userAddrress)
+        public
+        view
+        onlyIfVaultExists(_vaultAddress)
+        returns (VaultDetails memory vaultDetails)
+    {
+        VaultSummary memory vaultSummary = getVaultSummary(
+            _vaultAddress,
+            _userAddrress
+        );
+        IVault vault = IVault(_vaultAddress);
+        vaultDetails.status = vaultSummary.status;
+        vaultDetails.metaPointer = registeries[_vaultAddress].metaPointer;
+        vaultDetails.strategy = vault.strategy();
+
+        vaultDetails.tvl = vaultSummary.tvl;
+        vaultDetails.deposits = vaultSummary.deposits;
+        vaultDetails.token = vaultSummary.token;
+        vaultDetails.apyReports = vaultSummary.apyReports;
+
+        vaultDetails.strategist = vault.strategist();
+        vaultDetails.keeper = vault.keeper();
+        vaultDetails.guardian = vault.guardian();
+        vaultDetails.treasury = vault.treasury();
+        vaultDetails.badgerTree = vault.badgerTree();
+
+        vaultDetails.vaultAddress = _vaultAddress;
+
+        vaultDetails.name = vault.name();
+        vaultDetails.symbol = vault.symbol();
+        vaultDetails.performanceFeeGovernance = vault
+            .performanceFeeGovernance();
+        vaultDetails.performanceFeeStrategist = vault
+            .performanceFeeStrategist();
+        vaultDetails.withdrawalFee = vault.withdrawalFee();
+        vaultDetails.managementFee = vault.managementFee();
+
+        vaultDetails.lifeTimeEarned = vault.lifeTimeEarned();
+        vaultDetails.lastHarvestedAt = vault.lastHarvestedAt();
+        vaultDetails.lastHarvestAmount = vault.lastHarvestAmount();
+
+        // Balance of rewards
+        // USD
+        // tokenName
+    }
+
+    /// @notice using to get all strategists
+    function getAllStrategists() public view returns (address[] memory) {
+        address[] memory strategistsList = new address[](strategists.length());
+        for (uint256 i = 0; i < strategists.length(); i++) {
+            strategistsList[i] = strategists.at(i);
+        }
+        return strategistsList;
+    }
+
+    /// @notice using to get an strategist vaults
+    function getStrategistVaults(address _strategist, address _userAddrress)
+        public
+        view
+        returns (StrategistWithVaults memory)
+    {
+        VaultSummary[] memory strategistVaults = new VaultSummary[](
+            strategistsVaults[_strategist].length()
+        );
+        for (uint256 i = 0; i < strategistsVaults[_strategist].length(); i++) {
+            strategistVaults[i] = getVaultSummary(
+                strategistsVaults[_strategist].at(i),
+                _userAddrress
+            );
+        }
+        return StrategistWithVaults(_strategist, strategistVaults);
+    }
+
+    /// @notice using to get all vaults summary
+    function getAllStrategistsWithVaults(address _userAddrress)
+        public
+        view
+        returns (StrategistWithVaults[] memory)
+    {
+        StrategistWithVaults[]
+            memory strategistsWithVaults = new StrategistWithVaults[](
+                strategists.length()
+            );
+        for (uint256 i = 0; i < strategists.length(); i++) {
+            strategistsWithVaults[i] = getStrategistVaults(
+                strategists.at(i),
+                _userAddrress
+            );
+        }
+        return strategistsWithVaults;
     }
 }

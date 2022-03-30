@@ -27,7 +27,6 @@ describe("Chadger Tests", function () {
 
   it("Must be able to initialize contract with proper contract", async function () {
     signers = await ethers.getSigners();
-    2;
     chadgerGoverner = signers[10];
 
     const Vault = await ethers.getContractFactory("Vault");
@@ -109,7 +108,7 @@ describe("Chadger Tests", function () {
   it("Must be able to add new contract to registery", async function () {
     const MockToken = await ethers.getContractFactory("MockToken");
     mockToken1 = await MockToken.deploy();
-
+    await mockToken1.initialize([], []);
     strategiest1 = signers[14];
 
     keeper1 = signers[11].address;
@@ -175,9 +174,9 @@ describe("Chadger Tests", function () {
   });
 
   it("Must throw for getting a vault detail that does not exists", async function () {
-    await expect(chadgerRegistry.getVaultDetails(guardian1)).to.be.revertedWith(
-      "no vault exists"
-    );
+    await expect(
+      chadgerRegistry.getVaultDetails(guardian1, strategiest1.address)
+    ).to.be.revertedWith("no vault exists");
   });
 
   it("Must be able to get a vault addresses", async function () {
@@ -188,7 +187,8 @@ describe("Chadger Tests", function () {
   it("Must be able to get a vault details", async function () {
     const currentVaults = await chadgerRegistry.getVaultsAddresses();
     const firstVaultDetails = await chadgerRegistry.getVaultDetails(
-      currentVaults[0]
+      currentVaults[0],
+      strategiest1.address
     );
 
     expect(firstVaultDetails.strategist).to.equal(strategiest1.address);
@@ -196,7 +196,13 @@ describe("Chadger Tests", function () {
     expect(firstVaultDetails.metaPointer).to.equal(metaPointer1);
     expect(String(firstVaultDetails.tvl)).to.equal(String(0));
     expect(firstVaultDetails.vaultAddress).to.equal(currentVaults[0]);
-    expect(firstVaultDetails.token).to.equal(mockToken1.address);
+    expect(firstVaultDetails.token["tokenAddress"]).to.equal(
+      mockToken1.address
+    );
+    expect(firstVaultDetails.token["name"]).to.equal(
+      "badger.finance Mock Token"
+    );
+    expect(firstVaultDetails.token["symbol"]).to.equal("MOCK");
     expect(firstVaultDetails.keeper).to.equal(keeper1);
     expect(firstVaultDetails.guardian).to.equal(guardian1);
     expect(firstVaultDetails.treasury).to.equal(treasury1);
@@ -223,7 +229,8 @@ describe("Chadger Tests", function () {
   it("Must be able to get user balance for a vault", async function () {
     const currentVaults = await chadgerRegistry.getVaultsAddresses();
     const firstVaultDetails = await chadgerRegistry.getVaultDetails(
-      currentVaults[0]
+      currentVaults[0],
+      strategiest1.address
     );
 
     const userBalance = await chadgerRegistry.getUserVaultBalance(
@@ -231,7 +238,9 @@ describe("Chadger Tests", function () {
       strategiest1.address
     );
 
-    expect(String(userBalance.token)).to.equal(firstVaultDetails.token);
+    expect(String(userBalance.token)).to.equal(
+      firstVaultDetails.token.tokenAddress
+    );
     expect(String(userBalance.amount)).to.equal(String(0));
     expect(String(userBalance.usd)).to.equal(String(0));
   });
@@ -264,7 +273,8 @@ describe("Chadger Tests", function () {
       .withArgs(testStrategy.address);
 
     const firstVaultDetails = await chadgerRegistry.getVaultDetails(
-      currentVaults[0]
+      currentVaults[0],
+      strategiest1.address
     );
 
     expect(String(firstVaultDetails.strategy)).to.equal(testStrategy.address);
@@ -286,47 +296,48 @@ describe("Chadger Tests", function () {
       .withArgs(currentVaults[0], 1);
 
     const firstVaultDetails = await chadgerRegistry.getVaultDetails(
-      currentVaults[0]
+      currentVaults[0],
+      strategiest1.address
     );
 
     expect(String(firstVaultDetails.status)).to.equal(String(1));
   });
 
-  it("Let's test the APR calculator", async function () {
+  it("Let's test the APY calculator", async function () {
     const aYearAgo = parseInt(addMonths(new Date(), -12) / 1000);
     const sixMonthAgo = parseInt(addMonths(new Date(), -6) / 1000);
     const futureDate = parseInt(addMonths(new Date(), 1) / 1000);
 
     expect(
-      String(await chadgerRegistry.calculateAPR(200, 0, sixMonthAgo))
+      String(await chadgerRegistry.calculateAPY(200, 0, sixMonthAgo))
     ).to.equal("0");
 
     expect(
-      String(await chadgerRegistry.calculateAPR(200, 1000, futureDate))
+      String(await chadgerRegistry.calculateAPY(200, 1000, futureDate))
     ).to.equal("0");
 
     expect(
-      String(await chadgerRegistry.calculateAPR(0, 1000, aYearAgo))
+      String(await chadgerRegistry.calculateAPY(0, 1000, aYearAgo))
     ).to.equal("0");
 
     expect(
-      String(await chadgerRegistry.calculateAPR(0, 1000, aYearAgo))
+      String(await chadgerRegistry.calculateAPY(0, 1000, aYearAgo))
     ).to.equal("0");
 
     expect(
-      String(await chadgerRegistry.calculateAPR(1000, 1000, aYearAgo))
+      String(await chadgerRegistry.calculateAPY(1000, 1000, aYearAgo))
     ).to.equal("10000");
 
     expect(
-      String(await chadgerRegistry.calculateAPR(1000, 1000, sixMonthAgo))
+      String(await chadgerRegistry.calculateAPY(1000, 1000, sixMonthAgo))
     ).to.equal("20000");
 
     expect(
-      String(await chadgerRegistry.calculateAPR(200, 1000, sixMonthAgo))
+      String(await chadgerRegistry.calculateAPY(200, 1000, sixMonthAgo))
     ).to.equal("4000");
   });
 
-  it("Let's test the APR calculator", async function () {
+  it("Let's test the APY calculator", async function () {
     const currentVaults = await chadgerRegistry.getVaultsAddresses();
 
     await mockToken1.mint(signers[0].address, 400000);
@@ -343,15 +354,108 @@ describe("Chadger Tests", function () {
 
     await network.provider.send("evm_increaseTime", [3600 * 24 * 60]);
     await network.provider.send("evm_mine");
-    const VaultAPR2Month = await chadgerRegistry.getVaultAPR(currentVaults[0]);
+    const VaultAPY2Month = await chadgerRegistry.getVaultAPY(currentVaults[0]);
 
     await network.provider.send("evm_increaseTime", [3600 * 24 * 60]);
     await network.provider.send("evm_mine");
 
-    const VaultAPR4Month = await chadgerRegistry.getVaultAPR(currentVaults[0]);
+    const VaultAPY4Month = await chadgerRegistry.getVaultAPY(currentVaults[0]);
 
-    expect(String(VaultAPR2Month[1].apr.div(VaultAPR4Month[1].apr))).to.equal(
+    expect(String(VaultAPY2Month[1].apy.div(VaultAPY4Month[1].apy))).to.equal(
       String(2)
     );
+  });
+
+  it("Must be able to get a vault summary", async function () {
+    let currentVaults = await chadgerRegistry.getVaultsAddresses();
+
+    const firstVaultSummary = await chadgerRegistry.getVaultSummary(
+      currentVaults[0],
+      strategiest1.address
+    );
+
+    expect(firstVaultSummary.strategist).to.equal(strategiest1.address);
+    expect(firstVaultSummary.status).to.equal(1);
+    expect(firstVaultSummary.token["tokenAddress"]).to.equal(
+      mockToken1.address
+    );
+    expect(firstVaultSummary.token["name"]).to.equal(
+      "badger.finance Mock Token"
+    );
+    expect(firstVaultSummary.token["symbol"]).to.equal("MOCK");
+    expect(String(firstVaultSummary.tvl)).to.equal(String(400000));
+
+    await expect(
+      chadgerRegistry
+        .connect(strategiest1)
+        .addVault(
+          mockToken1.address,
+          keeper1,
+          guardian1,
+          treasury1,
+          badgerTree1,
+          name1,
+          symbol1,
+          [
+            performanceFeeGovernance1,
+            performanceFeeStrategist1,
+            withdrawalFee1,
+            managementFee1,
+          ],
+          metaPointer1
+        )
+    ).to.emit(chadgerRegistry, "VaultAdded");
+
+    currentVaults = await chadgerRegistry.getVaultsAddresses();
+
+    const secondVaultSummary = await chadgerRegistry.getVaultSummary(
+      currentVaults[1],
+      strategiest1.address
+    );
+
+    const secondVaultSummary2 = await chadgerRegistry.getVaultSummary(
+      currentVaults[1],
+      "0x0000000000000000000000000000000000000000"
+    );
+
+    expect(secondVaultSummary.apyReports.length).to.equal(1);
+    expect(secondVaultSummary2.deposits["token"]).to.equal(
+      "0x0000000000000000000000000000000000000000"
+    );
+  });
+
+  it("Must be able to get a vault summary", async function () {
+    let currentVaultsSummary = await chadgerRegistry.getVaultsSummary(
+      strategiest1.address
+    );
+
+    expect(currentVaultsSummary.length).to.equal(2);
+  });
+
+  it("Must be able to get all strategists", async function () {
+    let allStrategists = await chadgerRegistry.getAllStrategists();
+
+    expect(allStrategists.length).to.equal(1);
+  });
+
+  it("Must be able to get strategistVaults", async function () {
+    let allStrategists = await chadgerRegistry.getAllStrategists();
+
+    let strategistVaults = await chadgerRegistry.getStrategistVaults(
+      allStrategists[0],
+      "0x0000000000000000000000000000000000000000"
+    );
+
+    expect(strategistVaults.strategist).to.equal(allStrategists[0]);
+    expect(strategistVaults.vaults.length).to.equal(2);
+  });
+
+  it("Must be able to get all strategists with vaults", async function () {
+    let allStrategistsWithVaults =
+      await chadgerRegistry.getAllStrategistsWithVaults(
+        "0x0000000000000000000000000000000000000000"
+      );
+
+    expect(allStrategistsWithVaults.length).to.equal(1);
   });
 });

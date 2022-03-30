@@ -386,7 +386,7 @@ contract Vault is
     /// @notice Used by the strategy to report a harvest to the sett.
     ///         Issues shares for the strategist and treasury based on the performance fees and harvested amount.
     ///         Issues shares for the treasury based on the management fee and the time elapsed since last harvest.
-    ///         Updates harvest variables for on-chain APR tracking.
+    ///         Updates harvest variables for on-chain APY tracking.
     ///         This can only be called by the strategy.
     /// @dev This implicitly trusts that the strategy reports the correct amount.
     ///      Pausing on this function happens at the strategy level.
@@ -429,7 +429,7 @@ contract Vault is
     /// @notice Used by the strategy to report harvest of additional tokens to the sett.
     ///         Charges performance fees on the additional tokens and transfers fees to treasury and strategist.
     ///         The remaining amount is sent to badgerTree for emissions.
-    ///         Updates harvest variables for on-chain APR tracking.
+    ///         Updates harvest variables for on-chain APY tracking.
     ///         This can only be called by the strategy.
     /// @dev This function is called after the strategy sends the additional tokens to the sett.
     ///      Pausing on this function happens at the strategy level.
