@@ -1,4 +1,4 @@
-# Curation Game
+# Chadger Registry
 
 > install dependencies
 
